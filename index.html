@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cotizador tiivo sneakers</title>
+<style>
+  :root {
+    --negro: #000000;
+    --petroleo: #0E5A63;
+    --petroleo-claro: #3FB3BF;
+    --superficie: #101c1e;
+    --blanco: #FFFFFF;
+    --gris: #9db3b6;
+    --radio: 18px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--negro); }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", "Segoe UI", system-ui, sans-serif;
+    color: var(--blanco);
+    min-height: 100vh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    display: flex; justify-content: center;
+  }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 14px; }
+  header { padding: 4px 2px 2px; }
+  h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+  h1 span { color: var(--petroleo-claro); }
+  header p { color: var(--gris); font-size: .9rem; margin-top: 4px; }
+
+  .panel {
+    background: var(--superficie);
+    border: 2px solid var(--petroleo);
+    border-radius: var(--radio);
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: .95rem; }
+  select, input[type="number"] {
+    font: inherit; font-weight: 600; color: var(--blanco);
+    background: var(--negro);
+    border: 2px solid var(--petroleo);
+    border-radius: 14px;
+    padding: 13px 14px;
+    width: 100%;
+    appearance: none; -webkit-appearance: none;
+  }
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--petroleo-claro) 50%), linear-gradient(135deg, var(--petroleo-claro) 50%, transparent 50%);
+    background-position: calc(100% - 22px) 52%, calc(100% - 16px) 52%;
+    background-size: 6px 6px; background-repeat: no-repeat;
+    padding-right: 38px;
+  }
+  select:focus, input:focus, button:focus-visible { outline: 3px solid var(--petroleo-claro); outline-offset: 2px; }
+
+  .cantidad { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: stretch; }
+  .cantidad button {
+    font: inherit; font-size: 1.5rem; font-weight: 800; color: var(--blanco);
+    background: var(--petroleo); border: 0; border-radius: 14px; cursor: pointer;
+  }
+  .cantidad input { text-align: center; font-size: 1.15rem; }
+
+  .btn {
+    font: inherit; font-weight: 800; font-size: 1.05rem;
+    border: 0; border-radius: 16px; padding: 15px; cursor: pointer; width: 100%;
+  }
+  .btn-calcular { background: var(--petroleo-claro); color: var(--negro); }
+  .btn-copiar { background: var(--blanco); color: var(--negro); }
+  .btn:active { transform: scale(.98); }
+
+  #resultado { display: none; }
+  #resultado.visible { display: flex; }
+  .total-label { color: var(--gris); font-size: .85rem; font-weight: 700; }
+  .total { font-size: 2.6rem; font-weight: 800; line-height: 1; color: var(--petroleo-claro); }
+  pre {
+    font: inherit; font-size: .95rem; line-height: 1.5; white-space: pre-wrap;
+    background: var(--negro); border-radius: 14px; padding: 12px 14px; color: var(--blanco);
+  }
+  .error { color: #ff9b9b; font-size: .9rem; font-weight: 700; min-height: 1.2em; }
+  .aviso { text-align: center; color: var(--petroleo-claro); font-weight: 700; font-size: .9rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cotizador <span>tiivo</span> sneakers</h1>
+    <p>Elige servicio, cantidad y entrega.</p>
+  </header>
+
+  <section class="panel" aria-label="Datos del pedido">
+    <label>Servicio
+      <select id="servicio"></select>
+    </label>
+
+    <label for="cantidad">Cantidad
+      <div class="cantidad">
+        <button type="button" id="menos" aria-label="Quitar uno">−</button>
+        <input type="number" id="cantidad" min="1" step="1" value="1" inputmode="numeric">
+        <button type="button" id="mas" aria-label="Agregar uno">+</button>
+      </div>
+    </label>
+
+    <label>Canal de entrega
+      <select id="canal"></select>
+    </label>
+
+    <div class="error" id="error" role="alert"></div>
+    <button type="button" class="btn btn-calcular" id="calcular">Calcular</button>
+  </section>
+
+  <section class="panel" id="resultado" aria-live="polite">
+    <div>
+      <div class="total-label">Total del pedido</div>
+      <div class="total" id="total"></div>
+    </div>
+    <pre id="resumen"></pre>
+    <button type="button" class="btn btn-copiar" id="copiar">Copiar resumen</button>
+    <div class="aviso" id="aviso"></div>
+  </section>
+</main>
+
+<script>
+  // ===== PRECIOS Y REGLAS (edita aquí) =====
+  const SERVICIOS = [
+    { nombre: "Sneaker Spa", precio: 100 },
+    { nombre: "Premium",     precio: 130 },
+    { nombre: "Extra White", precio: 130 },
+    { nombre: "Caps",        precio: 80  }
+  ];
+  const CANALES = [
+    { nombre: "Entrego en punto de venta", costo: 0  },
+    { nombre: "Delivery en Puebla",        costo: 40 }
+  ];
+  // =========================================
+
+  const $ = id => document.getElementById(id);
+  const dinero = n => "$" + n.toLocaleString("es-MX") + " MXN";
+
+  SERVICIOS.forEach((s, i) => $("servicio").add(new Option(`${s.nombre} — $${s.precio}`, i)));
+  CANALES.forEach((c, i) => $("canal").add(new Option(c.costo ? `${c.nombre} (+$${c.costo})` : c.nombre, i)));
+
+  const leerCantidad = () => parseInt($("cantidad").value, 10);
+
+  $("menos").onclick = () => { $("cantidad").value = Math.max(1, (leerCantidad() || 1) - 1); ocultar(); };
+  $("mas").onclick   = () => { $("cantidad").value = (leerCantidad() || 0) + 1; ocultar(); };
+  ["servicio", "canal", "cantidad"].forEach(id => $(id).addEventListener("input", ocultar));
+
+  function ocultar() { $("resultado").classList.remove("visible"); $("error").textContent = ""; }
+
+  $("calcular").onclick = () => {
+    const cant = leerCantidad();
+    if (!Number.isInteger(cant) || cant < 1) {
+      $("error").textContent = "La cantidad debe ser 1 o más.";
+      $("resultado").classList.remove("visible");
+      return;
+    }
+    $("error").textContent = "";
+    const s = SERVICIOS[$("servicio").value];
+    const c = CANALES[$("canal").value];
+    const subtotal = s.precio * cant;
+    const total = subtotal + c.costo;
+
+    const lineas = [
+      "*Cotización tiivo sneakers*",
+      `Servicio: ${s.nombre}`,
+      `Cantidad: ${cant} × ${dinero(s.precio)} = ${dinero(subtotal)}`,
+      c.costo ? `Entrega: ${c.nombre} (+${dinero(c.costo)})` : `Entrega: ${c.nombre} (sin costo)`,
+      `*Total: ${dinero(total)}*`
+    ];
+    $("total").textContent = dinero(total);
+    $("resumen").textContent = lineas.join("\n");
+    $("aviso").textContent = "";
+    $("resultado").classList.add("visible");
+    $("resultado").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  $("copiar").onclick = async () => {
+    const texto = $("resumen").textContent;
+    let ok = false;
+    try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {}
+    if (!ok) { // respaldo para abrir el archivo directo (file://)
+      const t = document.createElement("textarea");
+      t.value = texto; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select();
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      t.remove();
+    }
+    $("aviso").textContent = ok ? "Copiado. Pégalo en WhatsApp." : "No se pudo copiar. Mantén presionado el texto para copiarlo.";
+  };
+</script>
+</body>
+</html>
